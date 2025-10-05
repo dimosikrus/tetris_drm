@@ -1,9 +1,3 @@
-// tetris_drm_double_buffer.cpp
-// Tetris on DRM with proper double-buffering and page flipping to prevent
-// tearing/freezing. Build: g++ tetris_drm_double_buffer.cpp -o
-// tetris_drm_double_buffer -I/usr/include/libdrm -ldrm -pthread -std=c++17 Run
-// (in a free VT as root): sudo ./tetris_drm_double_buffer
-
 #include <dirent.h>
 #include <drm.h>
 #include <drm_fourcc.h>
@@ -28,7 +22,6 @@
 #include <thread>
 #include <vector>
 
-// --- Unchanged Game Logic and Data Structures ---
 using namespace std;
 constexpr int BOARD_W = 10;
 constexpr int BOARD_H = 20;
@@ -38,12 +31,22 @@ int DISPLAY_X = 0, DISPLAY_Y = 0, NEXT_X = 0, NEXT_Y = 0;
 volatile sig_atomic_t stop_flag = 0;
 void sig_handler(int) { stop_flag = 1; }
 int board_arr[BOARD_H][BOARD_W];
+
 struct Color {
   uint8_t r, g, b;
 };
-vector<Color> palette = {{0, 0, 0},      {255, 85, 85},  {85, 255, 85},
-                         {85, 85, 255},  {255, 255, 85}, {85, 255, 255},
-                         {255, 85, 255}, {200, 200, 200}};
+
+vector<Color> palette = {
+  {0, 0, 0},
+  {255, 85, 85},
+  {85, 255, 85},
+  {85, 85, 255},
+  {255, 255, 85},
+  {85, 255, 255},
+  {255, 85, 255},
+  {200, 200, 200}
+};
+
 struct Piece {
   int type;
   int rot;
@@ -83,9 +86,7 @@ inline int piece_cell(int type, int rot, int x, int y) {
 static inline uint32_t color_u32(const Color &c) {
   return (uint32_t(c.r) << 16) | (uint32_t(c.g) << 8) | uint32_t(c.b);
 }
-// --- End of Unchanged Logic ---
 
-// --- NEW: DRM state now holds info for TWO buffers ---
 struct DUMB_Buffer {
   uint32_t handle = 0;
   uint32_t fb_id = 0;
@@ -97,8 +98,7 @@ struct DRMState {
   uint32_t pitch = 0;
   uint64_t buffer_sz = 0;
   DUMB_Buffer buffers[2];
-  uint32_t front_buffer =
-      0;  // Index (0 or 1) of the buffer currently on screen
+  uint32_t front_buffer = 0;
   drmModeCrtc *old_crtc = nullptr;
   drmModeConnector *connector = nullptr;
   drmModeRes *resources = nullptr;
@@ -112,9 +112,7 @@ struct InputDev {
 };
 vector<InputDev> input_devs;
 
-// --- MODIFIED: Drawing functions now need to know WHICH buffer to draw on ---
-void draw_rect_pixels(void *buffer_map, int x, int y, int w, int h,
-                      const Color &c) {
+void draw_rect_pixels(void *buffer_map, int x, int y, int w, int h, const Color &c) {
   if (!buffer_map) return;
   uint32_t col = color_u32(c);
   for (int py = y; py < y + h; ++py) {
@@ -128,8 +126,7 @@ void draw_rect_pixels(void *buffer_map, int x, int y, int w, int h,
   }
 }
 
-void draw_cell(void *buffer_map, int bx, int by, const Color &c,
-               bool is_next_piece) {
+void draw_cell(void *buffer_map, int bx, int by, const Color &c, bool is_next_piece) {
   int base_x = is_next_piece ? NEXT_X : DISPLAY_X;
   int base_y = is_next_piece ? NEXT_Y : DISPLAY_Y;
   int sx = base_x + bx * CELL_PX;
@@ -151,8 +148,7 @@ void render_all(uint32_t buffer_idx) {
   for (int y = 0; y < BOARD_H; ++y)
     for (int x = 0; x < BOARD_W; ++x) {
       int v = board_arr[y][x];
-      draw_cell(current_map, x, y,
-                palette[(v > 0 && v < (int)palette.size()) ? v : 0], false);
+      draw_cell(current_map, x, y, palette[(v > 0 && v < (int)palette.size()) ? v : 0], false);
     }
   for (int py = 0; py < 4; ++py)
     for (int px = 0; px < 4; ++px) {
@@ -162,8 +158,7 @@ void render_all(uint32_t buffer_idx) {
       int by = current_piece.y + py;
       if (by >= 0) draw_cell(current_map, bx, by, palette[v], false);
     }
-  draw_rect_pixels(current_map, NEXT_X - 4, NEXT_Y - 4, CELL_PX * 4 + 8,
-                   CELL_PX * 4 + 8, {50, 50, 50});
+  draw_rect_pixels(current_map, NEXT_X - 4, NEXT_Y - 4, CELL_PX * 4 + 8, CELL_PX * 4 + 8, {50, 50, 50});
   for (int py = 0; py < 4; ++py)
     for (int px = 0; px < 4; ++px) {
       int v = piece_cell(next_piece.type, next_piece.rot, px, py);
@@ -171,7 +166,6 @@ void render_all(uint32_t buffer_idx) {
     }
 }
 
-// --- Unchanged Collision, Placement, Line Clearing, etc. ---
 bool collision_at(const Piece &p) {
   for (int py = 0; py < 4; ++py)
     for (int px = 0; px < 4; ++px) {
@@ -260,9 +254,7 @@ void cleanup_input() {
   input_devs.clear();
 }
 
-// --- HEAVILY MODIFIED: DRM Cleanup and Initialization ---
 void drm_cleanup() {
-  // Restore the original display controller settings
   if (drm_state.old_crtc) {
     drmModeSetCrtc(drm_state.fd, drm_state.old_crtc->crtc_id,
                    drm_state.old_crtc->buffer_id, drm_state.old_crtc->x,
@@ -270,7 +262,6 @@ void drm_cleanup() {
                    &drm_state.old_crtc->mode);
     drmModeFreeCrtc(drm_state.old_crtc);
   }
-  // Unmap and destroy both dumb buffers
   for (int i = 0; i < 2; ++i) {
     if (drm_state.buffers[i].map)
       munmap(drm_state.buffers[i].map, (size_t)drm_state.buffer_sz);
@@ -286,8 +277,7 @@ void drm_cleanup() {
   if (drm_state.fd >= 0) close(drm_state.fd);
 }
 
-// REMEMBER TO CHANGE THIS TO card1 IF NEEDED!
-int init_drm_card(const char *cardpath = "/dev/dri/card1") {
+int init_drm_card(const char *cardpath = "/dev/dri/card0") {
   drm_state.fd = open(cardpath, O_RDWR | O_CLOEXEC);
   if (drm_state.fd < 0) {
     perror("open drm card");
@@ -334,7 +324,6 @@ int init_drm_card(const char *cardpath = "/dev/dri/card1") {
   NEXT_X = DISPLAY_X + BOARD_W * CELL_PX + 24;
   NEXT_Y = DISPLAY_Y;
 
-  // --- NEW: Create TWO dumb buffers and framebuffers ---
   for (int i = 0; i < 2; ++i) {
     struct drm_mode_create_dumb create = {};
     create.width = screen_w;
@@ -346,7 +335,7 @@ int init_drm_card(const char *cardpath = "/dev/dri/card1") {
       return -1;
     }
     drm_state.buffers[i].handle = create.handle;
-    if (i == 0) {  // Pitch and size are the same for both
+    if (i == 0) {
       drm_state.pitch = create.pitch;
       drm_state.buffer_sz = create.size;
     }
@@ -379,11 +368,7 @@ int init_drm_card(const char *cardpath = "/dev/dri/card1") {
       return -1;
     }
   }
-
-  // Initial setup: draw the first frame to buffer 0
   render_all(0);
-
-  // Set the display controller to show buffer 0
   if (drmModeSetCrtc(drm_state.fd, drm_state.crtc_id,
                      drm_state.buffers[0].fb_id, 0, 0,
                      &drm_state.connector->connector_id, 1,
