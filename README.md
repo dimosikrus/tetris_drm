@@ -9,6 +9,7 @@ chech in code your /dev/dri/card0
 Working only without DE (Desktop Enviroment) (Only Linux Terminal Mode)
 ```
 
+`pkg-config libdrm cmake`
 ```bash
 # Archlinux
 sudo pacman -S libdrm
@@ -16,7 +17,7 @@ sudo pacman -S libdrm
 yay -S libdrm
 
 # Ubuntu
-sudo apt install libdrm-dev -y
+sudo apt install libdrm-dev cmake pkg-config -y
 ```
 
 ## Build & Run
@@ -24,6 +25,11 @@ sudo apt install libdrm-dev -y
 chmod +x ./build.sh
 ./build.sh
 ./tetris_drm
+```
+## Cmake
+```bash
+cmake -B build -S .
+cmake --build build
 ```
 
 # Controls
