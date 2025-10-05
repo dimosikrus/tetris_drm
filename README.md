@@ -1,10 +1,12 @@
 # tetris_drm
 Tetris DRM (Direct Rendering Manager)
 
+```
 Created with [ChatGPT](https://chatgpt.com) & [Gemini 2.5 Pro](https://aistudio.google.com)
 Tested on ArchLinux 64bit & Ubuntu VPS
 (my card is /dev/dri/card1) (default is card0 (edit code manually))
 Working only without DE (Desktop Enviroment) (Only Linux Terminal Mode)
+```
 
 ```bash
 # Archlinux
