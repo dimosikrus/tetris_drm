@@ -19,9 +19,11 @@ chmod +x ./build.sh
 ```
 
 # Controls
+```
 LEFT/RIGHT - Move Horizontally
 UP - Rotate piece
 DOWN - Fast drop
 Q - Rage quit (exit)
+```
 
 ![tetris](https://github.com/user-attachments/assets/83042eb7-9a7b-48d0-bc01-493ebbce7df9)
